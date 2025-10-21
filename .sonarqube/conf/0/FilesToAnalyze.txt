@@ -1,0 +1,7 @@
+﻿D:\oop\c#\course3\NetSdrClientApp\Messages\NetSdrMessageHelper.cs
+D:\oop\c#\course3\NetSdrClientApp\NetSdrClient.cs
+D:\oop\c#\course3\NetSdrClientApp\Networking\ITcpClient.cs
+D:\oop\c#\course3\NetSdrClientApp\Networking\IUdpClient.cs
+D:\oop\c#\course3\NetSdrClientApp\Networking\TcpClientWrapper.cs
+D:\oop\c#\course3\NetSdrClientApp\Networking\UdpClientWrapper.cs
+D:\oop\c#\course3\NetSdrClientApp\Program.cs
