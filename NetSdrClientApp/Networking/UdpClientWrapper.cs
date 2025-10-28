@@ -46,22 +46,16 @@ namespace NetSdrClientApp.Networking
                 Console.WriteLine($"Error receiving message: {ex.Message}");
             }
         }
-
         public void StopListening()
         {
-            try
-            {
-                _cts?.Cancel();
-                _udpClient?.Close();
-                Console.WriteLine("Stopped listening for UDP messages.");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error while stopping: {ex.Message}");
-            }
+            Stop();
+        }
+        public void Exit()
+        {
+            Stop();
         }
 
-        public void Exit()
+        private void Stop()
         {
             try
             {
