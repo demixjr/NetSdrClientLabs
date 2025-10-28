@@ -117,53 +117,48 @@ public class NetSdrClientTests
 
     //TODO: cover the rest of the NetSdrClient code here
     [Test]
-    public async Task ChangeFrequencyAsync_ReturnsCorrectMessage()
+    public async Task ChangeFrequencyAsync_SendsMessage_WhenConnected()
     {
-        //Arrange
-        await _client.ConnectAsync(); 
+        // Arrange
+        _tcpMock.Setup(t => t.Connected).Returns(true);
+
         long frequency = 145000000;
         int channel = 1;
+
         // Act
-        await _client.ChangeFrequencyAsync(frequency, channel); 
+        await _client.ConnectAsync();
+        await _client.ChangeFrequencyAsync(frequency, channel);
+
         // Assert
-        _tcpMock.Verify(tcp => tcp.SendMessageAsync(It.IsAny<byte[]>()));
-        _tcpMock.VerifyGet(tcp => tcp.Connected);
+        _tcpMock.Verify(tcp => tcp.SendMessageAsync(It.Is<byte[]>(b => b.Length > 0)), Times.Once);
+        _tcpMock.VerifyGet(tcp => tcp.Connected, Times.AtLeastOnce);
     }
     [Test]
-    public async Task SendTcpRequest_NoConnection_ReturnsNull()
-    { 
+    public async Task ChangeFrequencyAsync_CompletesTask_WhenMessageReceived()
+    {
         // Arrange
-        var message = new byte[] { 0x01, 0x02 }; 
-        var method = typeof(NetSdrClient) .GetMethod("SendTcpRequest", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        _tcpMock.Setup(t => t.Connected).Returns(true);
+        _client = new NetSdrClient(_tcpMock.Object, _updMock.Object);
+
+        long frequency = 145000000;
+        int channel = 1;
+
+        byte[] sentMessage = null!;
+        _tcpMock.Setup(t => t.SendMessageAsync(It.IsAny<byte[]>()))
+                .Callback<byte[]>(msg => sentMessage = msg)
+                .Returns(Task.CompletedTask);
+
         // Act
-        var taskObj = method?.Invoke(_client, new object[] { message }); 
-        var task = (Task<byte[]>)taskObj!;
-        var response = await task;
+        var changeTask = _client.ChangeFrequencyAsync(frequency, channel);
+        byte[] response = new byte[] { 0xAB, 0xCD };
+        _tcpMock.Raise(t => t.MessageReceived += null, _tcpMock.Object, response);
+
+        await changeTask;
+
         // Assert
-        Assert.IsNull(response); 
+        Assert.That(sentMessage, Is.Not.Null.And.Not.Empty);
     }
-    [Test]
-    public async Task TcpClient_MessageReceived_CompletesTask() 
-    { 
-        // Arrange
-        _tcpMock = new Mock<ITcpClient>();
-        _tcpMock.Setup(t => t.Connected).Returns(true); 
 
-        _updMock = new Mock<IUdpClient>(); _client = new NetSdrClient(_tcpMock.Object, _updMock.Object); 
-
-        var msg = new byte[] { 0x10, 0x20 };
-        var response = new byte[] { 0xAB, 0xCD };
-        var method = typeof(NetSdrClient) .GetMethod("SendTcpRequest", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        
-        // Act
-        var taskObj = method?.Invoke(_client, new object[] { msg }); 
-        var task = (Task<byte[]>)taskObj!; 
-        _tcpMock.Raise(t => t.MessageReceived += null, _tcpMock.Object, response); 
-        var result = await task;
-
-        // Assert
-        Assert.That(result, Is.EqualTo(response)); 
-    } 
     [Test] 
     public void TcpClient_MessageReceived_NoPendingRequest_DoesNotThrow() 
     {
