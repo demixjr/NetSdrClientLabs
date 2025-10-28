@@ -116,4 +116,55 @@ public class NetSdrClientTests
     }
 
     //TODO: cover the rest of the NetSdrClient code here
+    [Test]
+    public async Task ChangeFrequencyAsync_SendsMessage_WhenConnected()
+    {
+        // Arrange
+        _tcpMock.Setup(t => t.Connected).Returns(true);
+
+        long frequency = 145000000;
+        int channel = 1;
+
+        // Act
+        await _client.ConnectAsync();
+        await _client.ChangeFrequencyAsync(frequency, channel);
+
+        // Assert
+        _tcpMock.Verify(tcp => tcp.SendMessageAsync(It.Is<byte[]>(b => b.Length > 0)), Times.Once);
+        _tcpMock.VerifyGet(tcp => tcp.Connected, Times.AtLeastOnce);
+    }
+    [Test]
+    public async Task ChangeFrequencyAsync_CompletesTask_WhenMessageReceived()
+    {
+        // Arrange
+        _tcpMock.Setup(t => t.Connected).Returns(true);
+        _client = new NetSdrClient(_tcpMock.Object, _updMock.Object);
+
+        long frequency = 145000000;
+        int channel = 1;
+
+        byte[] sentMessage = null!;
+        _tcpMock.Setup(t => t.SendMessageAsync(It.IsAny<byte[]>()))
+                .Callback<byte[]>(msg => sentMessage = msg)
+                .Returns(Task.CompletedTask);
+
+        // Act
+        var changeTask = _client.ChangeFrequencyAsync(frequency, channel);
+        byte[] response = new byte[] { 0xAB, 0xCD };
+        _tcpMock.Raise(t => t.MessageReceived += null, _tcpMock.Object, response);
+
+        await changeTask;
+
+        // Assert
+        Assert.That(sentMessage, Is.Not.Null.And.Not.Empty);
+    }
+
+    [Test]
+    public void TcpClient_MessageReceived_NoPendingRequest_DoesNotThrow()
+    {
+        // Arrange
+        var msg = new byte[] { 0xAA, 0xBB };
+        // Act & Assert
+        Assert.DoesNotThrow(() => _tcpMock.Raise(t => t.MessageReceived += null, _tcpMock.Object, msg));
+    }
 }
