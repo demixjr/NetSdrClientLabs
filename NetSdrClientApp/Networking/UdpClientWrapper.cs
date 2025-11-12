@@ -46,17 +46,14 @@ namespace NetSdrClientApp.Networking
                 Console.WriteLine($"Error receiving message: {ex.Message}");
             }
         }
-
         public void StopListening()
         {
             StopInternal();
         }
-
         public void Exit()
         {
             StopInternal();
         }
-
         private void StopInternal()
         {
             try
@@ -70,7 +67,6 @@ namespace NetSdrClientApp.Networking
                 Console.WriteLine($"Error while stopping: {ex.Message}");
             }
         }
-
 
         public override int GetHashCode()
         {

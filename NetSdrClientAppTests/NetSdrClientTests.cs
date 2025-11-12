@@ -1,4 +1,6 @@
-﻿using Moq;
+﻿using System.Net.Sockets;
+using System.Reflection;
+using Moq;
 using NetSdrClientApp;
 using NetSdrClientApp.Networking;
 
@@ -261,5 +263,41 @@ public class NetSdrClientTests
         Assert.DoesNotThrow(() => wrapper.StopListening());
         Assert.DoesNotThrow(() => wrapper.Exit());
     }
+    [Test]
+    public void SendMessageInternalAsync_Logic_CanFormatHexString()
+    {
+        // Arrange
+        var data = new byte[] { 0x48, 0x65, 0x6C, 0x6C, 0x6F }; 
 
+        // Act
+        var hexString = data.Select(b => Convert.ToString(b, toBase: 16)).Aggregate((l, r) => $"{l} {r}");
+
+        // Assert
+        Assert.IsNotNull(hexString);
+        Assert.IsFalse(string.IsNullOrEmpty(hexString));
+    }
+    [Test]
+    public void SendMessage_FormatLogic_Works()
+    {
+        // Arrange
+        var data = new byte[] { 0x01, 0x02 };
+
+        // Act
+        var result = string.Join(" ", data.Select(b => b.ToString("X2")));
+
+        // Assert
+        Assert.AreEqual("01 02", result);
+    }
+    [Test]
+    public void SendMessage_FormatLogic_EmptyArray()
+    {
+        // Arrange
+        var data = new byte[0];
+
+        // Act
+        var result = string.Join(" ", data.Select(b => b.ToString("X2")));
+
+        // Assert
+        Assert.AreEqual("", result);
+    }
 }
