@@ -49,19 +49,15 @@ namespace NetSdrClientApp.Networking
 
         public void StopListening()
         {
-            try
-            {
-                _cts?.Cancel();
-                _udpClient?.Close();
-                Console.WriteLine("Stopped listening for UDP messages.");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error while stopping: {ex.Message}");
-            }
+            StopInternal();
         }
 
         public void Exit()
+        {
+            StopInternal();
+        }
+
+        private void StopInternal()
         {
             try
             {
@@ -74,6 +70,7 @@ namespace NetSdrClientApp.Networking
                 Console.WriteLine($"Error while stopping: {ex.Message}");
             }
         }
+
 
         public override int GetHashCode()
         {

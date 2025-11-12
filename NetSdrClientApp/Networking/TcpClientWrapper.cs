@@ -73,30 +73,26 @@ namespace NetSdrClientApp.Networking
 
         public async Task SendMessageAsync(byte[] data)
         {
-            if (Connected && _stream != null && _stream.CanWrite)
-            {
-                Console.WriteLine($"Message sent: " + data.Select(b => Convert.ToString(b, toBase: 16)).Aggregate((l, r) => $"{l} {r}"));
-                await _stream.WriteAsync(data, 0, data.Length);
-            }
-            else
-            {
-                throw new InvalidOperationException("Not connected to a server.");
-            }
+            await SendMessageInternalAsync(data);
         }
 
         public async Task SendMessageAsync(string str)
         {
             var data = Encoding.UTF8.GetBytes(str);
-            if (Connected && _stream != null && _stream.CanWrite)
-            {
-                Console.WriteLine($"Message sent: " + data.Select(b => Convert.ToString(b, toBase: 16)).Aggregate((l, r) => $"{l} {r}"));
-                await _stream.WriteAsync(data, 0, data.Length);
-            }
-            else
+            await SendMessageInternalAsync(data);
+        }
+
+        private async Task SendMessageInternalAsync(byte[] data)
+        {
+            if (!Connected || _stream == null || !_stream.CanWrite)
             {
                 throw new InvalidOperationException("Not connected to a server.");
             }
+
+            Console.WriteLine($"Message sent: " + data.Select(b => Convert.ToString(b, toBase: 16)).Aggregate((l, r) => $"{l} {r}"));
+            await _stream.WriteAsync(data, 0, data.Length);
         }
+
 
         private async Task StartListeningAsync()
         {
