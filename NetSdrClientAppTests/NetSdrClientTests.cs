@@ -167,4 +167,99 @@ public class NetSdrClientTests
         // Act & Assert
         Assert.DoesNotThrow(() => _tcpMock.Raise(t => t.MessageReceived += null, _tcpMock.Object, msg));
     }
+
+    //Upd and Tcp Client Wrapper tests
+
+    [Test]
+    public async Task SendMessageAsync_WithByteArray_WhenNotConnected_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var wrapper = new TcpClientWrapper("localhost", 8080);
+        var data = new byte[] { 0x01, 0x02, 0x03 };
+
+        // Act & Assert
+        var ex = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await wrapper.SendMessageAsync(data));
+        Assert.AreEqual("Not connected to a server.", ex.Message);
+    }
+
+    [Test]
+    public async Task SendMessageAsync_WithString_WhenNotConnected_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var wrapper = new TcpClientWrapper("localhost", 8080);
+        var testString = "test message";
+
+        // Act & Assert
+        var ex = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await wrapper.SendMessageAsync(testString));
+        Assert.AreEqual("Not connected to a server.", ex.Message);
+    }
+
+    [Test]
+    public async Task SendMessageAsync_WithString_ConvertsToUtf8Bytes()
+    {
+        // Arrange
+        var wrapper = new TcpClientWrapper("localhost", 8080);
+        var testString = "hello";
+
+        // Act & Assert
+        Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await wrapper.SendMessageAsync(testString));
+    }
+
+    [Test]
+    public async Task SendMessageAsync_WithEmptyString_DoesNotThrowOnConversion()
+    {
+        // Arrange
+        var wrapper = new TcpClientWrapper("localhost", 8080);
+
+        // Act & Assert
+        Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await wrapper.SendMessageAsync(""));
+    }
+
+    [Test]
+    public void StopListening_WhenCalled_DoesNotThrow()
+    {
+        // Arrange
+        var wrapper = new UdpClientWrapper(8080);
+
+        // Act & Assert
+        Assert.DoesNotThrow(() => wrapper.StopListening());
+    }
+
+    [Test]
+    public void Exit_WhenCalled_DoesNotThrow()
+    {
+        // Arrange
+        var wrapper = new UdpClientWrapper(8080);
+
+        // Act & Assert
+        Assert.DoesNotThrow(() => wrapper.Exit());
+    }
+
+    [Test]
+    public void StopListening_And_Exit_BothCallSameInternalMethod()
+    {
+        // Arrange
+        var wrapper = new UdpClientWrapper(8080);
+
+        // Act & Assert
+        Assert.DoesNotThrow(() => wrapper.StopListening());
+        Assert.DoesNotThrow(() => wrapper.Exit());
+    }
+
+    [Test]
+    public void StopInternal_WhenCalledMultipleTimes_DoesNotThrow()
+    {
+        // Arrange
+        var wrapper = new UdpClientWrapper(8080);
+
+        // Act & Assert
+        Assert.DoesNotThrow(() => wrapper.StopListening());
+        Assert.DoesNotThrow(() => wrapper.StopListening());
+        Assert.DoesNotThrow(() => wrapper.Exit());
+    }
+
 }
