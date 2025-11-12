@@ -167,4 +167,48 @@ public class NetSdrClientTests
         // Act & Assert
         Assert.DoesNotThrow(() => _tcpMock.Raise(t => t.MessageReceived += null, _tcpMock.Object, msg));
     }
+    //UpdCluentWrapper tests
+    [Test]
+    public void StopListening_WhenCalled_DoesNotThrow()
+    {
+        // Arrange
+        var wrapper = new UdpClientWrapper(8080);
+
+        // Act & Assert
+        Assert.DoesNotThrow(() => wrapper.StopListening());
+    }
+
+    [Test]
+    public void Exit_WhenCalled_DoesNotThrow()
+    {
+        // Arrange
+        var wrapper = new UdpClientWrapper(8080);
+
+        // Act & Assert
+        Assert.DoesNotThrow(() => wrapper.Exit());
+    }
+
+    [Test]
+    public void StopListening_And_Exit_BothCallSameInternalMethod()
+    {
+        // Arrange
+        var wrapper = new UdpClientWrapper(8080);
+
+        // Act & Assert
+        Assert.DoesNotThrow(() => wrapper.StopListening());
+        Assert.DoesNotThrow(() => wrapper.Exit());
+    }
+
+    [Test]
+    public void StopInternal_WhenCalledMultipleTimes_DoesNotThrow()
+    {
+        // Arrange
+        var wrapper = new UdpClientWrapper(8080);
+
+        // Act & Assert
+        Assert.DoesNotThrow(() => wrapper.StopListening());
+        Assert.DoesNotThrow(() => wrapper.StopListening());
+        Assert.DoesNotThrow(() => wrapper.Exit());
+    }
+
 }
