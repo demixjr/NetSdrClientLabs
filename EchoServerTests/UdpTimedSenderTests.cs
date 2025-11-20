@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Threading;
 using Moq;
 using NUnit.Framework;
@@ -15,6 +16,8 @@ namespace EchoServer.Tests
         private Mock<TextWriter> _consoleOutputMock;
         private string _testHost;
         private int _testPort;
+        private const string Host = "127.0.0.1";
+        private const int Port = 9000;
 
         [SetUp]
         public void SetUp()
@@ -208,5 +211,158 @@ namespace EchoServer.Tests
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             method?.Invoke(obj, parameters);
         }
+        [Test]
+        public void StopSending_WhenTimerExists_DisposesAndSetsNull()
+        {
+            var sender = new UdpTimedSender(Host, Port);
+
+            // створюємо таймер вручну
+            var timerField = typeof(UdpTimedSender).GetField("_timer",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+
+            timerField.SetValue(sender, new Timer(_ => { }, null, 100, 100));
+
+            // act
+            sender.StopSending();
+
+            // assert
+            Assert.IsNull(timerField.GetValue(sender));
+        }
+
+        [Test]
+        public void StopSending_WhenTimerIsNull_DoesNotThrow()
+        {
+            var sender = new UdpTimedSender(Host, Port);
+
+            Assert.DoesNotThrow(() => sender.StopSending());
+        }
+
+        [Test]
+        public void Dispose_DisposesUdpClientAndTimer_NoExceptions()
+        {
+            var sender = new UdpTimedSender(Host, Port);
+
+            // ставимо таймер, щоб перевірити, що StopSending() його обнулить
+            var timerField = typeof(UdpTimedSender).GetField("_timer",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+
+            timerField.SetValue(sender, new Timer(_ => { }, null, 100, 100));
+
+            // ставимо udpClient вручну, хоча конструктор вже його створює
+            var udpField = typeof(UdpTimedSender).GetField("_udpClient",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+
+            udpField.SetValue(sender, new UdpClient());
+
+            Assert.DoesNotThrow(() => sender.Dispose());
+
+            // переконуємось, що таймер = null
+            Assert.IsNull(timerField.GetValue(sender));
+        }
+        [Test]
+        public void Constructor_SetsHostField()
+        {
+            var sender = new UdpTimedSender(Host, Port);
+
+            var hostField = typeof(UdpTimedSender).GetField("_host",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+
+            var value = hostField.GetValue(sender);
+
+            Assert.AreEqual(Host, value);
+        }
+
+        [Test]
+        public void Constructor_SetsPortField()
+        {
+            var sender = new UdpTimedSender(Host, Port);
+
+            var portField = typeof(UdpTimedSender).GetField("_port",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+
+            var value = portField.GetValue(sender);
+
+            Assert.AreEqual(Port, value);
+        }
+
+        [Test]
+        public void Constructor_CreatesUdpClient()
+        {
+            var sender = new UdpTimedSender(Host, Port);
+
+            var udpField = typeof(UdpTimedSender).GetField("_udpClient",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+
+            var value = udpField.GetValue(sender);
+
+            Assert.IsNotNull(value);
+            Assert.IsInstanceOf<UdpClient>(value);
+        }
+        [Test]
+        public void StartSending_WhenTimerIsNull_CreatesTimer()
+        {
+            var sender = new UdpTimedSender(Host, Port);
+
+            sender.StartSending(150);
+
+            var timerField = typeof(UdpTimedSender).GetField("_timer",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+
+            var timer = timerField.GetValue(sender);
+
+            Assert.IsNotNull(timer);
+            Assert.IsInstanceOf<Timer>(timer);
+        }
+
+        [Test]
+        public void StartSending_WhenAlreadyRunning_ThrowsInvalidOperationException()
+        {
+            var sender = new UdpTimedSender(Host, Port);
+
+            // вручну створюємо таймер
+            var timerField = typeof(UdpTimedSender).GetField("_timer",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+
+            timerField.SetValue(sender, new Timer(_ => { }, null, 100, 100));
+
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                sender.StartSending(200);
+            });
+        }
+        [Test]
+        public void SendMessageCallback_NormalFlow_IncrementsCounterAndBuildsMsg()
+        {
+            var sender = new UdpTimedSender(Host, Port);
+
+            // Отримуємо _counter до виклику
+            var counterField = typeof(UdpTimedSender)
+                .GetField("_counter", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            ushort before = (ushort)counterField.GetValue(sender);
+
+            // Викликаємо приватний метод через reflection
+            var method = typeof(UdpTimedSender)
+                .GetMethod("SendMessageCallback", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            Assert.DoesNotThrow(() => method.Invoke(sender, new object[] { null }));
+
+            // Перевіряємо, що _counter збільшився
+            ushort after = (ushort)counterField.GetValue(sender);
+            Assert.AreEqual(before + 1, after);
+        }
+
+        [Test]
+        public void SendMessageCallback_InvalidHost_ExecutesCatchBlock_NoException()
+        {
+            // Некоректний хост викличе IPAddress.Parse помилку → catch
+            var sender = new UdpTimedSender("256.0.0.1", Port);
+
+            var method = typeof(UdpTimedSender)
+                .GetMethod("SendMessageCallback", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            Assert.DoesNotThrow(() => method.Invoke(sender, new object[] { null }));
+        }
+
     }
 }
