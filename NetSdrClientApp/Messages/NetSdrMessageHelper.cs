@@ -4,7 +4,6 @@ using System.Linq;
 using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Threading.Tasks;
-using NetSdrClientApp.Networking;
 
 namespace NetSdrClientApp.Messages
 {
@@ -42,7 +41,6 @@ namespace NetSdrClientApp.Messages
 
         public static byte[] GetControlItemMessage(MsgTypes type, ControlItemCodes itemCode, byte[] parameters)
         {
-            var tcpClient = new TcpClientWrapper("127.0.0.1", 5000);
             return GetMessage(type, itemCode, parameters);
         }
 
