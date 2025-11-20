@@ -13,6 +13,8 @@ namespace EchoServer
         private readonly UdpClient _udpClient;
         private Timer _timer;
         private ushort _counter = 0;
+        private static readonly Random _rnd = new Random();
+
 
         public UdpTimedSender(string host, int port)
         {
@@ -34,7 +36,7 @@ namespace EchoServer
             try
             {
                 // Generate dummy data
-                Random rnd = new Random();
+                Random rnd = _rnd;
                 byte[] samples = new byte[1024];
                 rnd.NextBytes(samples);
                 _counter++;
