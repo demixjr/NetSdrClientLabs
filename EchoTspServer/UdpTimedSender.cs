@@ -14,7 +14,6 @@ namespace EchoServer
         private readonly UdpClient _udpClient;
         private Timer _timer;
         private ushort _counter = 0;
-        private static readonly Random _rnd = new Random();
 
 
         public UdpTimedSender(string host, int port)
