@@ -1,6 +1,8 @@
-using NUnit.Framework;
+﻿using NUnit.Framework;
 using System;
+using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -219,5 +221,19 @@ namespace EchoServer.Tests
             // Assert
             Assert.IsFalse(completed);
         }
+        private const int TestPort = 12346;
+
+        [Test]
+        public void Constructor_CreatesFields()
+        {
+            var server = new EchoServer(TestPort);
+
+            var portField = typeof(EchoServer).GetField("_port", BindingFlags.NonPublic | BindingFlags.Instance);
+            var ctsField = typeof(EchoServer).GetField("_cancellationTokenSource", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            Assert.AreEqual(TestPort, portField.GetValue(server));
+            Assert.IsNotNull(ctsField.GetValue(server));
+        }
+
     }
 }
