@@ -3,6 +3,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Security.Cryptography;
 
 namespace EchoServer
 {
@@ -36,9 +37,8 @@ namespace EchoServer
             try
             {
                 // Generate dummy data
-                Random rnd = _rnd;
                 byte[] samples = new byte[1024];
-                rnd.NextBytes(samples);
+                RandomNumberGenerator.Fill(samples);
                 _counter++;
 
                 byte[] msg = (new byte[] { 0x04, 0x84 })
