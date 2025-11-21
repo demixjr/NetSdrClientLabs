@@ -18,7 +18,7 @@ public class NetSdrClientTests
         _tcpMock = new Mock<ITcpClient>();
         _tcpMock.Setup(tcp => tcp.Connect()).Callback(() =>
         {
-            _tcpMock.Setup(tcp => tcp.Connected).Returns(true);
+            _tcpMock.Setup(tcp => tcp.Connected).Returns(true);                                                                                                                                                         
         });
 
         _tcpMock.Setup(tcp => tcp.Disconnect()).Callback(() =>
@@ -56,6 +56,7 @@ public class NetSdrClientTests
         //assert
         //No exception thrown
         _tcpMock.Verify(tcp => tcp.Disconnect(), Times.Once);
+        await Task.CompletedTask;
     }
 
     [Test]
