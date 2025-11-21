@@ -74,12 +74,14 @@ namespace NetSdrClientApp.Networking
 
         public override int GetHashCode()
         {
-            var payload = $"{nameof(UdpClientWrapper)}|{_localEndPoint.Address}|{_localEndPoint.Port}";
-
-            using var md5 = MD5.Create();
-            var hash = md5.ComputeHash(Encoding.UTF8.GetBytes(payload));
-
-            return BitConverter.ToInt32(hash, 0);
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 23 + nameof(UdpClientWrapper).GetHashCode();
+                hash = hash * 23 + _localEndPoint.Address.GetHashCode();
+                hash = hash * 23 + _localEndPoint.Port.GetHashCode();
+                return hash;
+            }
         }
     }
 }
