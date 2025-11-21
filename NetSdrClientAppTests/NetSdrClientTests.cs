@@ -1,4 +1,6 @@
-﻿using Moq;
+﻿using System.Reflection;
+using System.Text;
+using Moq;
 using NetSdrClientApp;
 using NetSdrClientApp.Networking;
 
@@ -286,5 +288,69 @@ public class NetSdrClientTests
 
         // Act & Assert
         Assert.That(wrapper2.GetHashCode(), Is.Not.EqualTo(wrapper1.GetHashCode()));
+    }
+
+    // TcpClientWrapper tests
+    [Test]
+    public void Constructor_ValidHostAndPort_SetsProperties()
+    {
+        // Arrange
+        var host = "127.0.0.1";
+        var port = 5000;
+
+        // Act
+        var wrapper = new TcpClientWrapper(host, port);
+
+        // Assert
+        var hostField = typeof(TcpClientWrapper).GetField("_host", BindingFlags.NonPublic | BindingFlags.Instance);
+        var portField = typeof(TcpClientWrapper).GetField("_port", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        Assert.That(hostField?.GetValue(wrapper), Is.EqualTo(host));
+        Assert.That(portField?.GetValue(wrapper), Is.EqualTo(port));
+    }
+    [Test]
+    public void Constructor_NullHost_DoesNotThrow()
+    {
+        // Arrange
+        string host = null!;
+        var port = 5000;
+
+        // Act & Assert
+        Assert.DoesNotThrow(() => new TcpClientWrapper(host, port));
+    }
+
+    [Test]
+    public void Constructor_InvalidPort_DoesNotThrow()
+    {
+        // Arrange
+        var host = "127.0.0.1";
+        var invalidPort = -1;
+
+        // Act & Assert 
+        Assert.DoesNotThrow(() => new TcpClientWrapper(host, invalidPort));
+    }
+    private static void SetPrivateField(object obj, string fieldName, object value)
+    {
+        var field = obj.GetType().GetField(fieldName,
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        field!.SetValue(obj, value);
+    }
+
+    private static T GetPrivateField<T>(object obj, string fieldName)
+    {
+        var field = obj.GetType().GetField(fieldName,
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        return (T)field!.GetValue(obj)!;
+    }
+
+    [Test]
+    public void SendMessageAsync_String_Throws_WhenNotConnected()
+    {
+        var client = new TcpClientWrapper("localhost", 5000);
+
+        Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await client.SendMessageAsync("msg");
+        });
     }
 }
