@@ -211,5 +211,80 @@ public class NetSdrClientTests
         Assert.DoesNotThrow(() => wrapper.StopListening());
         Assert.DoesNotThrow(() => wrapper.Exit());
     }
+    [Test]
+    public void Equals_SameEndPoint_ReturnsTrue()
+    {
+        // Arrange
+        var port = 5000;
+        var wrapper1 = new UdpClientWrapper(port);
+        var wrapper2 = new UdpClientWrapper(port);
 
+        // Act & Assert
+        Assert.That(wrapper2, Is.EqualTo(wrapper1));
+    }
+
+    [Test]
+    public void Equals_DifferentEndPoint_ReturnsFalse()
+    {
+        // Arrange
+        var wrapper1 = new UdpClientWrapper(5000);
+        var wrapper2 = new UdpClientWrapper(6000);
+
+        // Act & Assert
+        Assert.That(wrapper2, Is.Not.EqualTo(wrapper1));
+    }
+
+    [Test]
+    public void Equals_NullObject_ReturnsFalse()
+    {
+        // Arrange
+        var wrapper = new UdpClientWrapper(5000);
+
+        // Act & Assert
+        Assert.That(wrapper, Is.Not.EqualTo(null));
+    }
+
+    [Test]
+    public void Equals_DifferentType_ReturnsFalse()
+    {
+        // Arrange
+        var wrapper = new UdpClientWrapper(5000);
+        var differentObject = new object();
+
+        // Act & Assert
+        Assert.That(wrapper, Is.Not.EqualTo(differentObject));
+    }
+
+    [Test]
+    public void Equals_SameInstance_ReturnsTrue()
+    {
+        // Arrange
+        var wrapper = new UdpClientWrapper(5000);
+
+        // Act & Assert
+        Assert.That(wrapper, Is.EqualTo(wrapper));
+    }
+
+    [Test]
+    public void GetHashCode_SameEndPoint_SameHashCode()
+    {
+        // Arrange
+        var port = 5000;
+        var wrapper1 = new UdpClientWrapper(port);
+        var wrapper2 = new UdpClientWrapper(port);
+
+        // Act & Assert
+        Assert.That(wrapper2.GetHashCode(), Is.EqualTo(wrapper1.GetHashCode()));
+    }
+
+    [Test]
+    public void GetHashCode_DifferentEndPoint_DifferentHashCode()
+    {
+        // Arrange
+        var wrapper1 = new UdpClientWrapper(5000);
+        var wrapper2 = new UdpClientWrapper(6000);
+
+        // Act & Assert
+        Assert.That(wrapper2.GetHashCode(), Is.Not.EqualTo(wrapper1.GetHashCode()));
+    }
 }

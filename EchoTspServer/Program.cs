@@ -10,7 +10,7 @@ namespace EchoServer
             EchoServer server = new EchoServer(5000);
 
             // Start the server in a separate task
-            _ = Task.Run(() => server.StartAsync());
+            var serverTask = Task.Run(() => server.StartAsync());
 
             string host = "127.0.0.1"; // Target IP
             int port = 60000;          // Target Port

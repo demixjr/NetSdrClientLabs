@@ -37,7 +37,7 @@ namespace NetSdrClientApp.Networking
                     Console.WriteLine($"Received from {result.RemoteEndPoint}");
                 }
             }
-            catch (OperationCanceledException ex)
+            catch (OperationCanceledException)
             {
                 //empty
             }
@@ -82,6 +82,11 @@ namespace NetSdrClientApp.Networking
                 hash = hash * 23 + _localEndPoint.Port.GetHashCode();
                 return hash;
             }
+        }
+        public override bool Equals(object? obj)
+        {
+            return obj is UdpClientWrapper wrapper &&
+                   _localEndPoint.Equals(wrapper._localEndPoint);
         }
     }
 }
