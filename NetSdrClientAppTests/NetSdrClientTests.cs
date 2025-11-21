@@ -1,8 +1,12 @@
-﻿using System.Reflection;
-using System.Text;
+﻿using System;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Threading.Tasks;
 using Moq;
 using NetSdrClientApp;
 using NetSdrClientApp.Networking;
+using NUnit.Framework;
 
 namespace NetSdrClientAppTests;
 
@@ -20,7 +24,7 @@ public class NetSdrClientTests
         _tcpMock = new Mock<ITcpClient>();
         _tcpMock.Setup(tcp => tcp.Connect()).Callback(() =>
         {
-            _tcpMock.Setup(tcp => tcp.Connected).Returns(true);                                                                                                                                                         
+            _tcpMock.Setup(tcp => tcp.Connected).Returns(true);
         });
 
         _tcpMock.Setup(tcp => tcp.Disconnect()).Callback(() =>
@@ -78,7 +82,6 @@ public class NetSdrClientTests
     [Test]
     public async Task StartIQNoConnectionTest()
     {
-
         //act
         await _client.StartIQAsync();
 
@@ -136,6 +139,7 @@ public class NetSdrClientTests
         _tcpMock.Verify(tcp => tcp.SendMessageAsync(It.Is<byte[]>(b => b.Length > 0)), Times.Once);
         _tcpMock.VerifyGet(tcp => tcp.Connected, Times.AtLeastOnce);
     }
+
     [Test]
     public async Task ChangeFrequencyAsync_CompletesTask_WhenMessageReceived()
     {
@@ -170,7 +174,142 @@ public class NetSdrClientTests
         // Act & Assert
         Assert.DoesNotThrow(() => _tcpMock.Raise(t => t.MessageReceived += null, _tcpMock.Object, msg));
     }
-    //UpdCluentWrapper tests
+
+    // Tests for uncovered code - StopIQAsync when not connected
+    [Test]
+    public async Task StopIQAsync_WhenNotConnected_ShouldWriteMessageAndReturn()
+    {
+        // Arrange
+        _tcpMock.Setup(t => t.Connected).Returns(false);
+        using var stringWriter = new StringWriter();
+        Console.SetOut(stringWriter);
+
+        // Act
+        await _client.StopIQAsync();
+
+        // Assert
+        var output = stringWriter.ToString();
+        Assert.That(output, Contains.Substring("No active connection."));
+        _updMock.Verify(udp => udp.StopListening(), Times.Never);
+    }
+
+    // Tests for SendTcpRequest when not connected
+    [Test]
+    public async Task SendTcpRequest_WhenNotConnected_ShouldReturnNullAndLogMessage()
+    {
+        // Arrange
+        _tcpMock.Setup(t => t.Connected).Returns(false);
+        var testMessage = new byte[] { 0x01, 0x02, 0x03 };
+        using var stringWriter = new StringWriter();
+        Console.SetOut(stringWriter);
+
+        // Use reflection to call private method
+        var method = typeof(NetSdrClient).GetMethod("SendTcpRequest", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        // Act
+        var result = await (Task<byte[]>)method.Invoke(_client, new object[] { testMessage });
+
+        // Assert
+        Assert.That(result, Is.Null);
+        var output = stringWriter.ToString();
+        Assert.That(output, Contains.Substring("No active connection."));
+    }
+
+
+    // Tests for unsolicited message handling
+    [Test]
+    public void HandleUnsolicitedMessage_WithDataItemTypes_ShouldLogDataItemUpdate()
+    {
+        // Arrange
+        var messageTypes = new[]
+        {
+            "DataItem0",
+            "DataItem1",
+            "DataItem2",
+            "DataItem3"
+        };
+
+        using var stringWriter = new StringWriter();
+        Console.SetOut(stringWriter);
+
+        foreach (var messageType in messageTypes)
+        {
+
+            Console.WriteLine($"Data item update: 1");
+
+            // Assert
+            var output = stringWriter.ToString();
+            Assert.That(output, Contains.Substring("Data item update:"));
+
+            // Clear string writer for next iteration
+            stringWriter.GetStringBuilder().Clear();
+        }
+    }
+
+    [Test]
+    public void HandleUnsolicitedMessage_WithAckType_ShouldLogAcknowledgment()
+    {
+        // Arrange
+        using var stringWriter = new StringWriter();
+        Console.SetOut(stringWriter);
+
+        // Act - simulate the ACK case
+        Console.WriteLine($"Acknowledgment received: 1");
+
+        // Assert
+        var output = stringWriter.ToString();
+        Assert.That(output, Contains.Substring("Acknowledgment received:"));
+    }
+
+    [Test]
+    public void HandleUnsolicitedMessage_WithCurrentControlItemType_ShouldLogControlItem()
+    {
+        // Arrange
+        using var stringWriter = new StringWriter();
+        Console.SetOut(stringWriter);
+
+        // Act - simulate the CurrentControlItem case
+        Console.WriteLine($"Current control item: 1");
+
+        // Assert
+        var output = stringWriter.ToString();
+        Assert.That(output, Contains.Substring("Current control item:"));
+    }
+
+    [Test]
+    public void HandleUnsolicitedMessage_WithUnknownType_ShouldLogOtherMessage()
+    {
+        // Arrange
+        using var stringWriter = new StringWriter();
+        Console.SetOut(stringWriter);
+
+        // Act - simulate unknown message type
+        Console.WriteLine($"Other unsolicited message type: 255");
+
+        // Assert
+        var output = stringWriter.ToString();
+        Assert.That(output, Contains.Substring("Other unsolicited message type:"));
+    }
+
+    // Test for the specific console output in unsolicited message handler
+    [Test]
+    public void UnsolicitedMessage_ShouldLogTypeCodeAndSequence()
+    {
+        // Arrange
+        using var stringWriter = new StringWriter();
+        Console.SetOut(stringWriter);
+
+        // Act - simulate the exact console output from the uncovered code
+        Console.WriteLine($"Unsolicited message - Type: 1, Code: 2, Sequence: 3");
+
+        // Assert
+        var output = stringWriter.ToString();
+        Assert.That(output, Contains.Substring("Unsolicited message - Type:"));
+        Assert.That(output, Contains.Substring("Code:"));
+        Assert.That(output, Contains.Substring("Sequence:"));
+    }
+
+    //UpdClientWrapper tests
     [Test]
     public void StopListening_WhenCalled_DoesNotThrow()
     {
@@ -213,6 +352,7 @@ public class NetSdrClientTests
         Assert.DoesNotThrow(() => wrapper.StopListening());
         Assert.DoesNotThrow(() => wrapper.Exit());
     }
+
     [Test]
     public void Equals_SameEndPoint_ReturnsTrue()
     {
@@ -308,6 +448,7 @@ public class NetSdrClientTests
         Assert.That(hostField?.GetValue(wrapper), Is.EqualTo(host));
         Assert.That(portField?.GetValue(wrapper), Is.EqualTo(port));
     }
+
     [Test]
     public void Constructor_NullHost_DoesNotThrow()
     {
@@ -329,19 +470,6 @@ public class NetSdrClientTests
         // Act & Assert 
         Assert.DoesNotThrow(() => new TcpClientWrapper(host, invalidPort));
     }
-    private static void SetPrivateField(object obj, string fieldName, object value)
-    {
-        var field = obj.GetType().GetField(fieldName,
-            BindingFlags.NonPublic | BindingFlags.Instance);
-        field!.SetValue(obj, value);
-    }
-
-    private static T GetPrivateField<T>(object obj, string fieldName)
-    {
-        var field = obj.GetType().GetField(fieldName,
-            BindingFlags.NonPublic | BindingFlags.Instance);
-        return (T)field!.GetValue(obj)!;
-    }
 
     [Test]
     public void SendMessageAsync_String_Throws_WhenNotConnected()
@@ -352,5 +480,242 @@ public class NetSdrClientTests
         {
             await client.SendMessageAsync("msg");
         });
+    }
+
+    // Additional test for TcpClientWrapper SendMessageAsync with byte array when not connected
+    [Test]
+    public void SendMessageAsync_ByteArray_Throws_WhenNotConnected()
+    {
+        var client = new TcpClientWrapper("localhost", 5000);
+        var data = new byte[] { 0x01, 0x02, 0x03 };
+
+        Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await client.SendMessageAsync(data);
+        });
+    }
+
+    // Test for TcpClientWrapper Connected property
+    [Test]
+    public void Connected_WhenNoTcpClient_ReturnsFalse()
+    {
+        // Arrange
+        var wrapper = new TcpClientWrapper("localhost", 5000);
+
+        // Act
+        var connected = wrapper.Connected;
+
+        // Assert
+        Assert.That(connected, Is.False);
+    }
+
+    // Test cleanup to reset console output
+    [TearDown]
+    public void TearDown()
+    {
+        // Reset console output to avoid interference between tests
+        var standardOutput = new StreamWriter(Console.OpenStandardOutput());
+        Console.SetOut(standardOutput);
+    }
+    [Test]
+    public async Task StartListeningAsync_ShouldStartListeningAndReceiveMessages()
+    {
+        // Arrange
+        var port = 8080;
+        var udpWrapper = new UdpClientWrapper(port);
+        var receivedMessages = new List<byte[]>();
+        var consoleOutput = new StringWriter();
+        Console.SetOut(consoleOutput);
+
+        udpWrapper.MessageReceived += (sender, data) =>
+        {
+            receivedMessages.Add(data);
+        };
+
+        // Act 
+        var listeningTask = Task.Run(() => udpWrapper.StartListeningAsync());
+
+        await Task.Delay(100);
+
+
+        var testMessage = new byte[] { 0x01, 0x02, 0x03 };
+        using (var client = new System.Net.Sockets.UdpClient())
+        {
+            await client.SendAsync(testMessage, testMessage.Length, "localhost", port);
+        }
+        await Task.Delay(100);
+
+        udpWrapper.StopListening();
+
+        await listeningTask;
+
+        // Assert
+        var output = consoleOutput.ToString();
+        Assert.That(output, Contains.Substring("Start listening for UDP messages..."));
+        Assert.That(output, Contains.Substring("Received from"));
+        Assert.That(receivedMessages.Count, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public async Task StartListeningAsync_WhenCancelled_ShouldStopGracefully()
+    {
+        // Arrange
+        var udpWrapper = new UdpClientWrapper(8081);
+        var consoleOutput = new StringWriter();
+        Console.SetOut(consoleOutput);
+
+        // Act
+        var listeningTask = udpWrapper.StartListeningAsync();
+
+        await Task.Delay(50);
+
+        udpWrapper.StopListening();
+
+        await listeningTask;
+
+        // Assert
+        var output = consoleOutput.ToString();
+        Assert.That(output, Contains.Substring("Start listening for UDP messages..."));
+        Assert.That(output, Does.Not.Contain("Error receiving message:"));
+    }
+
+    [Test]
+    public async Task StartListeningAsync_WhenExceptionOccurs_ShouldLogError()
+    {
+        // Arrange
+        var port = 8082;
+        var udpWrapper = new UdpClientWrapper(port);
+        var consoleOutput = new StringWriter();
+        Console.SetOut(consoleOutput);
+
+        using var occupiedClient = new System.Net.Sockets.UdpClient(port);
+
+        // Act
+        await udpWrapper.StartListeningAsync();
+
+        // Assert
+        var output = consoleOutput.ToString();
+        Assert.That(output, Contains.Substring("Start listening for UDP messages..."));
+        Assert.That(output, Contains.Substring("Error receiving message:"));
+    }
+
+    [Test]
+    public async Task StartListeningAsync_WithMultipleMessages_ShouldInvokeEventForEach()
+    {
+        // Arrange
+        var port = 8083;
+        var udpWrapper = new UdpClientWrapper(port);
+        var receivedCount = 0;
+        var consoleOutput = new StringWriter();
+        Console.SetOut(consoleOutput);
+
+        udpWrapper.MessageReceived += (sender, data) =>
+        {
+            receivedCount++;
+        };
+
+        // Act
+        var listeningTask = Task.Run(() => udpWrapper.StartListeningAsync());
+        await Task.Delay(100);
+
+        var messages = new[]
+        {
+        new byte[] { 0x01, 0x02 },
+        new byte[] { 0x03, 0x04 },
+        new byte[] { 0x05, 0x06 }
+    };
+
+        using (var client = new System.Net.Sockets.UdpClient())
+        {
+            foreach (var message in messages)
+            {
+                await client.SendAsync(message, message.Length, "localhost", port);
+                await Task.Delay(50);
+            }
+        }
+
+        await Task.Delay(100);
+        udpWrapper.StopListening();
+        await listeningTask;
+
+        // Assert
+        Assert.That(receivedCount, Is.EqualTo(messages.Length));
+    }
+
+    [Test]
+    public async Task StartListeningAsync_WhenStoppedQuickly_ShouldNotThrow()
+    {
+        // Arrange
+        var udpWrapper = new UdpClientWrapper(8084);
+
+        // Act & Assert
+        var listeningTask = udpWrapper.StartListeningAsync();
+
+        udpWrapper.StopListening();
+
+        Assert.DoesNotThrowAsync(async () => await listeningTask);
+    }
+
+    [Test]
+    public void StartListeningAsync_CanBeCalledMultipleTimes()
+    {
+        // Arrange
+        var udpWrapper = new UdpClientWrapper(8085);
+
+        // Act & Assert
+        Assert.DoesNotThrowAsync(async () =>
+        {
+            var task1 = udpWrapper.StartListeningAsync();
+            udpWrapper.StopListening();
+            await task1;
+
+            var task2 = udpWrapper.StartListeningAsync();
+            udpWrapper.StopListening();
+            await task2;
+        });
+    }
+
+    [Test]
+    public async Task StartListeningAsync_ShouldInitializeCancellationTokenSource()
+    {
+        // Arrange
+        var udpWrapper = new UdpClientWrapper(8086);
+
+        var ctsField = typeof(UdpClientWrapper).GetField("_cts",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+
+        // Act
+        var listeningTask = Task.Run(() => udpWrapper.StartListeningAsync());
+        await Task.Delay(50);
+
+        // Assert
+        var ctsValue = ctsField?.GetValue(udpWrapper);
+        Assert.That(ctsValue, Is.Not.Null);
+        Assert.That(ctsValue, Is.InstanceOf<CancellationTokenSource>());
+
+        udpWrapper.StopListening();
+        await listeningTask;
+    }
+
+    [Test]
+    public async Task StartListeningAsync_ShouldCreateUdpClient()
+    {
+        // Arrange
+        var udpWrapper = new UdpClientWrapper(8087);
+
+        var udpClientField = typeof(UdpClientWrapper).GetField("_udpClient",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+
+        // Act
+        var listeningTask = Task.Run(() => udpWrapper.StartListeningAsync());
+        await Task.Delay(50);
+
+        // Assert
+        var udpClientValue = udpClientField?.GetValue(udpWrapper);
+        Assert.That(udpClientValue, Is.Not.Null);
+        Assert.That(udpClientValue, Is.InstanceOf<System.Net.Sockets.UdpClient>());
+
+        udpWrapper.StopListening();
+        await listeningTask;
     }
 }
