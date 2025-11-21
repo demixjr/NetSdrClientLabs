@@ -8,8 +8,7 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using static NetSdrClientApp.Messages.NetSdrMessageHelper;
-using static System.Runtime.InteropServices.JavaScript.JSType;
-
+using static System.Runtime.InteropServices.JavaScript.JSType;       
 namespace NetSdrClientApp
 {
     public class NetSdrClient
@@ -66,7 +65,7 @@ namespace NetSdrClientApp
                 return;
             }
 
-;           var iqDataMode = (byte)0x80;
+            var iqDataMode = (byte)0x80;
             var start = (byte)0x02;
             var fifo16bitCaptureMode = (byte)0x01;
             var n = (byte)1;
@@ -114,9 +113,9 @@ namespace NetSdrClientApp
             await SendTcpRequest(msg);
         }
 
-        private void _udpClient_MessageReceived(object? sender, byte[] e)
+        private static void _udpClient_MessageReceived(object? sender, byte[] e)
         {
-            NetSdrMessageHelper.TranslateMessage(e, out MsgTypes type, out ControlItemCodes code, out ushort sequenceNum, out byte[] body);
+            NetSdrMessageHelper.TranslateMessage(e, out _ , out _ , out _ , out byte[] body);
             var samples = NetSdrMessageHelper.GetSamples(16, body);
 
             Console.WriteLine($"Samples recieved: " + body.Select(b => Convert.ToString(b, toBase: 16)).Aggregate((l, r) => $"{l} {r}"));
@@ -133,7 +132,7 @@ namespace NetSdrClientApp
 
         private TaskCompletionSource<byte[]> responseTaskSource;
 
-        private async Task<byte[]> SendTcpRequest(byte[] msg)
+        private async Task<byte[]?> SendTcpRequest(byte[] msg)
         {
             if (!_tcpClient.Connected)
             {
@@ -153,13 +152,54 @@ namespace NetSdrClientApp
 
         private void _tcpClient_MessageReceived(object? sender, byte[] e)
         {
-            //TODO: add Unsolicited messages handling here
+            if (responseTaskSource == null)
+            {
+                Console.WriteLine($"Unsolicited message received: {BitConverter.ToString(e)}");
+
+                try
+                {
+                    NetSdrMessageHelper.TranslateMessage(e, out MsgTypes messageType, out ControlItemCodes code, out ushort sequenceNum, out byte[] body);
+                    Console.WriteLine($"Unsolicited message - Type: {messageType}, Code: {code}, Sequence: {sequenceNum}");
+
+                    switch (messageType)
+                    {
+                        case MsgTypes.DataItem0:
+                        case MsgTypes.DataItem1:
+                        case MsgTypes.DataItem2:
+                        case MsgTypes.DataItem3:
+                            Console.WriteLine($"Data item update: {code}");
+                            break;
+
+                        case MsgTypes.Ack:
+                            Console.WriteLine($"Acknowledgment received: {code}");
+                            break;
+
+                        case MsgTypes.CurrentControlItem:
+                            Console.WriteLine($"Current control item: {code}");
+                            break;
+
+                        default:
+                            Console.WriteLine($"Other unsolicited message type: {messageType}");
+                            break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error parsing unsolicited message: {ex.Message}");
+                }
+
+                string hexString = e.Select(b => b.ToString("X2")).Aggregate((l, r) => $"{l} {r}");
+                Console.WriteLine($"Unsolicited message (hex): {hexString}");
+                return;
+            }
+
             if (responseTaskSource != null)
             {
                 responseTaskSource.SetResult(e);
-                responseTaskSource = null;
+                responseTaskSource = null!;
             }
-            Console.WriteLine("Response recieved: " + e.Select(b => Convert.ToString(b, toBase: 16)).Aggregate((l, r) => $"{l} {r}"));
+
+            Console.WriteLine("Response received: " + e.Select(b => Convert.ToString(b, toBase: 16)).Aggregate((l, r) => $"{l} {r}"));
         }
     }
 }
