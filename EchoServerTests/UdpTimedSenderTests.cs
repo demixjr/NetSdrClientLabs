@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Threading;
 using Moq;
+using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 
 namespace EchoServer.Tests
@@ -35,8 +36,8 @@ namespace EchoServer.Tests
             using var sender = new UdpTimedSender(_testHost, _testPort);
 
             // Assert
-            Assert.AreEqual(_testHost, GetPrivateField<string>(sender, "_host"));
-            Assert.AreEqual(_testPort, GetPrivateField<int>(sender, "_port"));
+            Assert.That(GetPrivateField<string>(sender, "_host"), Is.EqualTo(_testHost));
+            Assert.That(GetPrivateField<int>(sender, "_port"), Is.EqualTo(_testPort));
             Assert.IsNotNull(GetPrivateField<UdpClient>(sender, "_udpClient"));
         }
 
@@ -52,7 +53,7 @@ namespace EchoServer.Tests
 
             // Assert
             var timer = GetPrivateField<Timer>(sender, "_timer");
-            Assert.IsNotNull(timer);
+            Assert.That(timer, Is.Not.Null);
         }
 
         [Test]
@@ -75,11 +76,11 @@ namespace EchoServer.Tests
             var initialCounter = GetPrivateField<ushort>(sender, "_counter");
 
             // Act
-            InvokePrivateMethod(sender, "SendMessageCallback", new object[] { null });
+            InvokePrivateMethod(sender, "SendMessageCallback", new object[] { null! });
 
             // Assert
             var newCounter = GetPrivateField<ushort>(sender, "_counter");
-            Assert.AreEqual(initialCounter + 1, newCounter);
+            Assert.That(newCounter, Is.EqualTo(initialCounter + 1));
             _consoleOutputMock.Verify(x => x.WriteLine($"Message sent to {_testHost}:{_testPort} "), Times.Once());
         }
 
@@ -91,7 +92,7 @@ namespace EchoServer.Tests
             var initialCounter = GetPrivateField<ushort>(sender, "_counter");
 
             // Act
-            InvokePrivateMethod(sender, "SendMessageCallback", new object[] { null });
+            InvokePrivateMethod(sender, "SendMessageCallback", new object[] { null! });
 
             // Assert
             _consoleOutputMock.Verify(x => x.WriteLine(It.Is<string>(s => s.StartsWith("Error sending message:"))), Times.Once());
@@ -111,11 +112,11 @@ namespace EchoServer.Tests
 
             // Assert
             var newCounter = GetPrivateField<ushort>(sender, "_counter");
-            Assert.AreEqual(initialCounter + 1, newCounter);
+            Assert.That(newCounter, Is.EqualTo(initialCounter + 1));
 
             _consoleOutputMock.Verify(x => x.WriteLine($"Message sent to {_testHost}:{_testPort} "), Times.Once());
 
-            Assert.IsFalse(GetPrivateField<bool>(udpClient, "_disposed"));
+            Assert.That(GetPrivateField<bool>(udpClient, "_disposed"), Is.False);
         }
         [Test]
         public void StopSending_DisposesTimer()
@@ -130,7 +131,7 @@ namespace EchoServer.Tests
 
             // Assert
             var timerAfter = GetPrivateField<Timer>(sender, "_timer");
-            Assert.IsNull(timerAfter);
+            Assert.That(timerAfter,Is.Null);
         }
 
         [Test]
@@ -156,7 +157,7 @@ namespace EchoServer.Tests
 
             // Assert 
             var timer = GetPrivateField<Timer>(sender, "_timer");
-            Assert.IsNull(timer);
+            Assert.That(timer, Is.Null);
 
             Assert.Throws<ObjectDisposedException>(() =>
             {
@@ -175,14 +176,14 @@ namespace EchoServer.Tests
         }
 
         [Test]
-        public void IntegrationTest_CompleteWorkflow()
+        public async Task IntegrationTest_CompleteWorkflow()
         {
             // Arrange
             using var sender = new UdpTimedSender(_testHost, _testPort);
 
             // Act & Assert 
             Assert.DoesNotThrow(() => sender.StartSending(100));
-            Thread.Sleep(150); 
+            await Task.Delay(150);
             Assert.DoesNotThrow(() => sender.StopSending());
             Assert.DoesNotThrow(() => sender.Dispose());
         }
@@ -198,14 +199,14 @@ namespace EchoServer.Tests
             Assert.DoesNotThrow(() => sender.Dispose()); 
         }
 
-        private T GetPrivateField<T>(object obj, string fieldName)
+        private static T GetPrivateField<T>(object obj, string fieldName)
         {
             var field = obj.GetType().GetField(fieldName,
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             return (T)field?.GetValue(obj);
         }
 
-        private void InvokePrivateMethod(object obj, string methodName, object[] parameters)
+        private static void InvokePrivateMethod(object obj, string methodName, object[] parameters)
         {
             var method = obj.GetType().GetMethod(methodName,
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -216,17 +217,16 @@ namespace EchoServer.Tests
         {
             var sender = new UdpTimedSender(Host, Port);
 
-            // створюємо таймер вручну
             var timerField = typeof(UdpTimedSender).GetField("_timer",
                 BindingFlags.NonPublic | BindingFlags.Instance);
 
-            timerField.SetValue(sender, new Timer(_ => { }, null, 100, 100));
+            timerField?.SetValue(sender, new Timer(_ => { }, null, 100, 100));
 
             // act
             sender.StopSending();
 
             // assert
-            Assert.IsNull(timerField.GetValue(sender));
+            Assert.That(timerField?.GetValue(sender), Is.Null);
         }
 
         [Test]
@@ -242,22 +242,21 @@ namespace EchoServer.Tests
         {
             var sender = new UdpTimedSender(Host, Port);
 
-            // ставимо таймер, щоб перевірити, що StopSending() його обнулить
             var timerField = typeof(UdpTimedSender).GetField("_timer",
                 BindingFlags.NonPublic | BindingFlags.Instance);
 
-            timerField.SetValue(sender, new Timer(_ => { }, null, 100, 100));
+            timerField?.SetValue(sender, new Timer(_ => { }, null, 100, 100));
 
-            // ставимо udpClient вручну, хоча конструктор вже його створює
+            // Act
             var udpField = typeof(UdpTimedSender).GetField("_udpClient",
                 BindingFlags.NonPublic | BindingFlags.Instance);
 
-            udpField.SetValue(sender, new UdpClient());
+            udpField?.SetValue(sender, new UdpClient());
 
             Assert.DoesNotThrow(() => sender.Dispose());
 
-            // переконуємось, що таймер = null
-            Assert.IsNull(timerField.GetValue(sender));
+            // Assert
+            Assert.That(timerField?.GetValue(sender), Is.Null);
         }
         [Test]
         public void Constructor_SetsHostField()
@@ -267,9 +266,9 @@ namespace EchoServer.Tests
             var hostField = typeof(UdpTimedSender).GetField("_host",
                 BindingFlags.NonPublic | BindingFlags.Instance);
 
-            var value = hostField.GetValue(sender);
+            var value = hostField?.GetValue(sender);
 
-            Assert.AreEqual(Host, value);
+            Assert.That(value, Is.EqualTo(Host));
         }
 
         [Test]
@@ -280,9 +279,9 @@ namespace EchoServer.Tests
             var portField = typeof(UdpTimedSender).GetField("_port",
                 BindingFlags.NonPublic | BindingFlags.Instance);
 
-            var value = portField.GetValue(sender);
+            var value = portField?.GetValue(sender);
 
-            Assert.AreEqual(Port, value);
+            Assert.That(value, Is.EqualTo(Port));
         }
 
         [Test]
@@ -293,10 +292,10 @@ namespace EchoServer.Tests
             var udpField = typeof(UdpTimedSender).GetField("_udpClient",
                 BindingFlags.NonPublic | BindingFlags.Instance);
 
-            var value = udpField.GetValue(sender);
+            var value = udpField?.GetValue(sender);
 
-            Assert.IsNotNull(value);
-            Assert.IsInstanceOf<UdpClient>(value);
+            Assert.That(value, Is.Not.Null);
+            Assert.That(value, Is.InstanceOf<UdpClient>());
         }
         [Test]
         public void StartSending_WhenTimerIsNull_CreatesTimer()
@@ -308,10 +307,11 @@ namespace EchoServer.Tests
             var timerField = typeof(UdpTimedSender).GetField("_timer",
                 BindingFlags.NonPublic | BindingFlags.Instance);
 
-            var timer = timerField.GetValue(sender);
+            var timer = timerField?.GetValue(sender);
 
-            Assert.IsNotNull(timer);
-            Assert.IsInstanceOf<Timer>(timer);
+
+            Assert.That(timer, Is.Not.Null);
+            Assert.That(timer, Is.InstanceOf<Timer>());
         }
 
         [Test]
@@ -319,11 +319,11 @@ namespace EchoServer.Tests
         {
             var sender = new UdpTimedSender(Host, Port);
 
-            // вручну створюємо таймер
+            // Arrange
             var timerField = typeof(UdpTimedSender).GetField("_timer",
                 BindingFlags.NonPublic | BindingFlags.Instance);
 
-            timerField.SetValue(sender, new Timer(_ => { }, null, 100, 100));
+            timerField?.SetValue(sender, new Timer(_ => { }, null, 100, 100));
 
             Assert.Throws<InvalidOperationException>(() =>
             {
@@ -335,33 +335,29 @@ namespace EchoServer.Tests
         {
             var sender = new UdpTimedSender(Host, Port);
 
-            // Отримуємо _counter до виклику
             var counterField = typeof(UdpTimedSender)
                 .GetField("_counter", BindingFlags.NonPublic | BindingFlags.Instance);
 
-            ushort before = (ushort)counterField.GetValue(sender);
+            ushort before = (ushort)(counterField?.GetValue(sender) ?? throw new InvalidOperationException("Counter field is null"));
 
-            // Викликаємо приватний метод через reflection
             var method = typeof(UdpTimedSender)
                 .GetMethod("SendMessageCallback", BindingFlags.NonPublic | BindingFlags.Instance);
 
-            Assert.DoesNotThrow(() => method.Invoke(sender, new object[] { null }));
+            Assert.DoesNotThrow(() => method?.Invoke(sender, new object[] { null! }));
 
-            // Перевіряємо, що _counter збільшився
-            ushort after = (ushort)counterField.GetValue(sender);
-            Assert.AreEqual(before + 1, after);
+            ushort after = (ushort)(counterField.GetValue(sender) ?? throw new InvalidOperationException("Counter field is null"));
+            Assert.That(after, Is.EqualTo(before + 1));
         }
 
         [Test]
         public void SendMessageCallback_InvalidHost_ExecutesCatchBlock_NoException()
         {
-            // Некоректний хост викличе IPAddress.Parse помилку → catch
             var sender = new UdpTimedSender("256.0.0.1", Port);
 
             var method = typeof(UdpTimedSender)
                 .GetMethod("SendMessageCallback", BindingFlags.NonPublic | BindingFlags.Instance);
 
-            Assert.DoesNotThrow(() => method.Invoke(sender, new object[] { null }));
+            Assert.DoesNotThrow(() => method?.Invoke(sender, new object[] { null! }));
         }
 
     }
