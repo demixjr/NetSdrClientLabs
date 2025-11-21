@@ -36,9 +36,12 @@ namespace EchoServer.Tests
             using var sender = new UdpTimedSender(_testHost, _testPort);
 
             // Assert
-            Assert.That(GetPrivateField<string>(sender, "_host"), Is.EqualTo(_testHost));
-            Assert.That(GetPrivateField<int>(sender, "_port"), Is.EqualTo(_testPort));
-            Assert.IsNotNull(GetPrivateField<UdpClient>(sender, "_udpClient"));
+            Assert.Multiple(() =>
+            {
+                Assert.That(GetPrivateField<string>(sender, "_host"), Is.EqualTo(_testHost));
+                Assert.That(GetPrivateField<int>(sender, "_port"), Is.EqualTo(_testPort));
+                Assert.That(GetPrivateField<UdpClient>(sender, "_udpClient"), Is.Not.Null);
+            });
         }
 
         [Test]
@@ -108,7 +111,7 @@ namespace EchoServer.Tests
             var udpClient = GetPrivateField<UdpClient>(sender, "_udpClient");
 
             // Act
-            InvokePrivateMethod(sender, "SendMessageCallback", new object[] { null });
+            InvokePrivateMethod(sender, "SendMessageCallback", new object[] { null! });
 
             // Assert
             var newCounter = GetPrivateField<ushort>(sender, "_counter");
@@ -202,9 +205,12 @@ namespace EchoServer.Tests
         private static T GetPrivateField<T>(object obj, string fieldName)
         {
             var field = obj.GetType().GetField(fieldName,
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            return (T)field?.GetValue(obj);
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                ?? throw new ArgumentException($"Field {fieldName} not found");
+
+            return (T)field.GetValue(obj)!;
         }
+
 
         private static void InvokePrivateMethod(object obj, string methodName, object[] parameters)
         {

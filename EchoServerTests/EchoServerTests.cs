@@ -170,9 +170,12 @@ namespace EchoServer.Tests
             var responses = await Task.WhenAll(t1, t2, t3);
 
             // Assert
-            Assert.That(responses[0], Is.EqualTo("client1"));
-            Assert.That(responses[1], Is.EqualTo("client2"));
-            Assert.That(responses[2], Is.EqualTo("client3"));
+            Assert.Multiple(() =>
+            {
+                Assert.That(responses[0], Is.EqualTo("client1"));
+                Assert.That(responses[1], Is.EqualTo("client2"));
+                Assert.That(responses[2], Is.EqualTo("client3"));
+            });
         }
 
         [Test]
@@ -195,7 +198,7 @@ namespace EchoServer.Tests
 
             // Act
             byte[] buffer = new byte[1024];
-            int read = await stream.ReadAsync(buffer, 0, buffer.Length);
+            int read = await stream.ReadAsync(new Memory<byte>(buffer));
             string response = Encoding.UTF8.GetString(buffer, 0, read);
 
             // Assert
@@ -233,8 +236,11 @@ namespace EchoServer.Tests
             var portField = typeof(EchoServer).GetField("_port", BindingFlags.NonPublic | BindingFlags.Instance);
             var ctsField = typeof(EchoServer).GetField("_cancellationTokenSource", BindingFlags.NonPublic | BindingFlags.Instance);
 
-            Assert.That(portField?.GetValue(server), Is.EqualTo(TestPort));
-            Assert.That(ctsField?.GetValue(server), Is.Not.Null);
+            Assert.Multiple(() =>
+            {
+                Assert.That(portField?.GetValue(server), Is.EqualTo(TestPort));
+                Assert.That(ctsField?.GetValue(server), Is.Not.Null);
+            });
         }
 
     }

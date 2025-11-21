@@ -7,14 +7,14 @@ using System.Security.Cryptography;
 
 namespace EchoServer
 {
-    public class UdpTimedSender : IDisposable
+    public sealed class UdpTimedSender : IDisposable
     {
         private readonly string _host;
         private readonly int _port;
         private readonly UdpClient _udpClient;
         private Timer? _timer;
         private ushort _counter = 0;
-
+        private bool _disposed = false;
 
         public UdpTimedSender(string host, int port)
         {
@@ -25,6 +25,9 @@ namespace EchoServer
 
         public void StartSending(int intervalMilliseconds)
         {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(UdpTimedSender));
+
             if (_timer != null)
                 throw new InvalidOperationException("Sender is already running.");
 
@@ -33,6 +36,8 @@ namespace EchoServer
 
         private void SendMessageCallback(object? state)
         {
+            if (_disposed) return;
+
             try
             {
                 // Generate dummy data
@@ -59,14 +64,18 @@ namespace EchoServer
         public void StopSending()
         {
             _timer?.Dispose();
-            _timer = null!;
+            _timer = null;
         }
 
         public void Dispose()
         {
-            StopSending();
-            _udpClient.Dispose();
-            GC.SuppressFinalize(this);
+            if (!_disposed)
+            {
+                StopSending();
+                _udpClient.Dispose();
+                _disposed = true;
+                GC.SuppressFinalize(this);
+            }
         }
     }
 }
