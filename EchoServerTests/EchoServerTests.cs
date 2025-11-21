@@ -1,10 +1,12 @@
-﻿using NUnit.Framework;
+﻿using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities;
+using NUnit.Framework;
 using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace EchoServer.Tests
 {
@@ -48,16 +50,16 @@ namespace EchoServer.Tests
                 byte[] data = Encoding.UTF8.GetBytes(message);
 
                 // Act
-                await stream.WriteAsync(data, 0, data.Length);
+                await stream.WriteAsync(new ReadOnlyMemory<byte>(data));
 
                 // Act
                 byte[] buffer = new byte[1024];
-                int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
+                int bytesRead = await stream.ReadAsync(new Memory<byte>(buffer));
 
                 string response = Encoding.UTF8.GetString(buffer, 0, bytesRead);
 
                 // Assert
-                Assert.AreEqual(message, response);
+                Assert.That(response, Is.EqualTo(message));
             }
         }
 
@@ -78,16 +80,16 @@ namespace EchoServer.Tests
                     byte[] send = Encoding.UTF8.GetBytes(msg);
 
                     // Act
-                    await stream.WriteAsync(send, 0, send.Length);
+                    await stream.WriteAsync(new ReadOnlyMemory<byte>(send));
 
                     // Act
                     byte[] buffer = new byte[1024];
-                    int read = await stream.ReadAsync(buffer, 0, buffer.Length);
+                    int read = await stream.ReadAsync(new Memory<byte>(buffer));
 
                     string response = Encoding.UTF8.GetString(buffer, 0, read);
 
                     // Assert
-                    Assert.AreEqual(msg, response);
+                    Assert.That(response, Is.EqualTo(msg));
                 }
             }
         }
@@ -124,16 +126,16 @@ namespace EchoServer.Tests
             byte[] data = Encoding.UTF8.GetBytes(message);
 
             // Act
-            await stream.WriteAsync(data, 0, data.Length);
+            await stream.WriteAsync(new ReadOnlyMemory<byte>(data));
 
             // Act
             byte[] buffer = new byte[6000];
-            int read = await stream.ReadAsync(buffer, 0, buffer.Length);
+            int read = await stream.ReadAsync(new Memory<byte>(buffer));
 
             string response = Encoding.UTF8.GetString(buffer, 0, read);
 
             // Assert
-            Assert.AreEqual(message, response);
+            Assert.That(response, Is.EqualTo(message));
         }
 
         [Test]
@@ -151,11 +153,11 @@ namespace EchoServer.Tests
                 byte[] sendData = Encoding.UTF8.GetBytes(text);
 
                 // Act
-                await stream.WriteAsync(sendData, 0, sendData.Length);
+                await stream.WriteAsync(new ReadOnlyMemory<byte>(sendData));
 
                 // Act
                 byte[] buffer = new byte[1024];
-                int read = await stream.ReadAsync(buffer, 0, buffer.Length);
+                int read = await stream.ReadAsync(new Memory<byte>(buffer));
 
                 return Encoding.UTF8.GetString(buffer, 0, read);
             }
@@ -168,9 +170,9 @@ namespace EchoServer.Tests
             var responses = await Task.WhenAll(t1, t2, t3);
 
             // Assert
-            Assert.AreEqual("client1", responses[0]);
-            Assert.AreEqual("client2", responses[1]);
-            Assert.AreEqual("client3", responses[2]);
+            Assert.That(responses[0], Is.EqualTo("client1"));
+            Assert.That(responses[1], Is.EqualTo("client2"));
+            Assert.That(responses[2], Is.EqualTo("client3"));
         }
 
         [Test]
@@ -189,7 +191,7 @@ namespace EchoServer.Tests
             byte[] send = Encoding.UTF8.GetBytes(msg);
 
             // Act
-            await stream.WriteAsync(send, 0, send.Length);
+            await stream.WriteAsync(new ReadOnlyMemory<byte>(send));
 
             // Act
             byte[] buffer = new byte[1024];
@@ -197,7 +199,7 @@ namespace EchoServer.Tests
             string response = Encoding.UTF8.GetString(buffer, 0, read);
 
             // Assert
-            Assert.AreEqual(msg, response);
+            Assert.That(response, Is.EqualTo(msg));
         }
 
         [Test]
@@ -213,13 +215,13 @@ namespace EchoServer.Tests
             byte[] empty = Array.Empty<byte>();
 
             // Act
-            await stream.WriteAsync(empty, 0, empty.Length);
+            await stream.WriteAsync(new ReadOnlyMemory<byte>(empty));
 
             var readTask = stream.ReadAsync(new byte[1024], 0, 1024);
             bool completed = await Task.WhenAny(readTask, Task.Delay(150)) == readTask;
 
             // Assert
-            Assert.IsFalse(completed);
+            Assert.That(completed, Is.False);
         }
         private const int TestPort = 12346;
 
@@ -231,8 +233,8 @@ namespace EchoServer.Tests
             var portField = typeof(EchoServer).GetField("_port", BindingFlags.NonPublic | BindingFlags.Instance);
             var ctsField = typeof(EchoServer).GetField("_cancellationTokenSource", BindingFlags.NonPublic | BindingFlags.Instance);
 
-            Assert.AreEqual(TestPort, portField.GetValue(server));
-            Assert.IsNotNull(ctsField.GetValue(server));
+            Assert.That(portField?.GetValue(server), Is.EqualTo(TestPort));
+            Assert.That(ctsField?.GetValue(server), Is.Not.Null);
         }
 
     }
