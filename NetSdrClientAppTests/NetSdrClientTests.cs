@@ -207,7 +207,7 @@ public class NetSdrClientTests
         var method = typeof(NetSdrClient).GetMethod("SendTcpRequest", BindingFlags.NonPublic | BindingFlags.Instance);
 
         // Act
-        var result = await (Task<byte[]>)method.Invoke(_client, new object[] { testMessage });
+        var result = await (Task<byte[]>)method?.Invoke(_client, new object[] { testMessage })!;
 
         // Assert
         Assert.That(result, Is.Null);
@@ -401,10 +401,11 @@ public class NetSdrClientTests
     public void Equals_SameInstance_ReturnsTrue()
     {
         // Arrange
-        var wrapper = new UdpClientWrapper(5000);
+        var wrapper1 = new UdpClientWrapper(5000);
+        var wrapper2 = new UdpClientWrapper(5000);
 
         // Act & Assert
-        Assert.That(wrapper, Is.EqualTo(wrapper));
+        Assert.That(wrapper1, Is.EqualTo(wrapper2));
     }
 
     [Test]
@@ -445,8 +446,11 @@ public class NetSdrClientTests
         var hostField = typeof(TcpClientWrapper).GetField("_host", BindingFlags.NonPublic | BindingFlags.Instance);
         var portField = typeof(TcpClientWrapper).GetField("_port", BindingFlags.NonPublic | BindingFlags.Instance);
 
-        Assert.That(hostField?.GetValue(wrapper), Is.EqualTo(host));
-        Assert.That(portField?.GetValue(wrapper), Is.EqualTo(port));
+        Assert.Multiple(() =>
+        {
+            Assert.That(hostField?.GetValue(wrapper), Is.EqualTo(host));
+            Assert.That(portField?.GetValue(wrapper), Is.EqualTo(port));
+        });
     }
 
     [Test]
@@ -552,8 +556,11 @@ public class NetSdrClientTests
         // Assert
         var output = consoleOutput.ToString();
         Assert.That(output, Contains.Substring("Start listening for UDP messages..."));
-        Assert.That(output, Contains.Substring("Received from"));
-        Assert.That(receivedMessages.Count, Is.GreaterThan(0));
+        Assert.Multiple(() =>
+        {
+            Assert.That(output, Contains.Substring("Received from"));
+            Assert.That(receivedMessages, Has.Count.GreaterThan(0));
+        });
     }
 
     [Test]
@@ -650,10 +657,8 @@ public class NetSdrClientTests
 
         // Act & Assert
         var listeningTask = udpWrapper.StartListeningAsync();
-
         udpWrapper.StopListening();
-
-        Assert.DoesNotThrowAsync(async () => await listeningTask);
+        await listeningTask;
     }
 
     [Test]
