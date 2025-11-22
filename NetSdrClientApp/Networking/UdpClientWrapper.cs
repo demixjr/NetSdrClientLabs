@@ -41,7 +41,7 @@ namespace NetSdrClientApp.Networking
             }
             catch (OperationCanceledException)
             {
-
+                Console.WriteLine("Listening cancelled gracefully."); 
             }
             catch (Exception ex)
             {
