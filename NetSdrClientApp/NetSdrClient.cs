@@ -152,46 +152,7 @@ namespace NetSdrClientApp
 
         private void _tcpClient_MessageReceived(object? sender, byte[] e)
         {
-            if (responseTaskSource == null)
-            {
-                Console.WriteLine($"Unsolicited message received: {BitConverter.ToString(e)}");
-
-                try
-                {
-                    NetSdrMessageHelper.TranslateMessage(e, out MsgTypes messageType, out ControlItemCodes code, out ushort sequenceNum, out byte[] body);
-                    Console.WriteLine($"Unsolicited message - Type: {messageType}, Code: {code}, Sequence: {sequenceNum}");
-
-                    switch (messageType)
-                    {
-                        case MsgTypes.DataItem0:
-                        case MsgTypes.DataItem1:
-                        case MsgTypes.DataItem2:
-                        case MsgTypes.DataItem3:
-                            Console.WriteLine($"Data item update: {code}");
-                            break;
-
-                        case MsgTypes.Ack:
-                            Console.WriteLine($"Acknowledgment received: {code}");
-                            break;
-
-                        case MsgTypes.CurrentControlItem:
-                            Console.WriteLine($"Current control item: {code}");
-                            break;
-
-                        default:
-                            Console.WriteLine($"Other unsolicited message type: {messageType}");
-                            break;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error parsing unsolicited message: {ex.Message}");
-                }
-
-                string hexString = e.Select(b => b.ToString("X2")).Aggregate((l, r) => $"{l} {r}");
-                Console.WriteLine($"Unsolicited message (hex): {hexString}");
-                return;
-            }
+            //TODO: add Unsolicited messages handling here
 
             if (responseTaskSource != null)
             {
