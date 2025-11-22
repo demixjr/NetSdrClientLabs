@@ -242,6 +242,22 @@ namespace EchoServer.Tests
                 Assert.That(ctsField?.GetValue(server), Is.Not.Null);
             });
         }
+        [Test]
+        public async Task TaskRun_StartAsync_DoesNotThrow()
+        {
+            // Arrange
+            var server = new EchoServer(5001);
+
+            // Act + Assert 
+            var task = Task.Run(server.StartAsync);
+
+            await Task.Delay(150); 
+
+            Assert.That(task.IsCompleted, Is.False,
+                "StartAsync має працювати вічно, тому Task не повинен бути завершеним");
+
+            server.Stop(); 
+        }
 
     }
 }

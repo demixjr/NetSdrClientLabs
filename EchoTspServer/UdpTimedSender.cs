@@ -25,8 +25,7 @@ namespace EchoServer
 
         public void StartSending(int intervalMilliseconds)
         {
-            if (_disposed)
-                throw new ObjectDisposedException(nameof(UdpTimedSender));
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
             if (_timer != null)
                 throw new InvalidOperationException("Sender is already running.");
