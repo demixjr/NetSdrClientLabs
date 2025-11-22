@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace NetSdrClientApp.Networking
 {
-    public class TcpClientWrapper : ITcpClient
+    public class TcpClientWrapper : ITcpClient, IDisposable
     {
         private readonly string _host;
         private readonly int _port;
@@ -37,10 +37,11 @@ namespace NetSdrClientApp.Networking
             }
 
             _tcpClient = new TcpClient();
-
             try
             {
+                _cts?.Dispose();
                 _cts = new CancellationTokenSource();
+
                 _tcpClient.Connect(_host, _port);
                 _stream = _tcpClient.GetStream();
                 Console.WriteLine($"Connected to {_host}:{_port}");
@@ -51,7 +52,14 @@ namespace NetSdrClientApp.Networking
                 Console.WriteLine($"Failed to connect: {ex.Message}");
             }
         }
-
+        public void Dispose()
+        {
+            _cts?.Dispose();
+            _tcpClient?.Close();
+            _stream?.Dispose();
+            _tcpClient?.Dispose();
+            _tcpClient = null;
+        }
         public void Disconnect()
         {
             if (Connected)
@@ -136,5 +144,5 @@ namespace NetSdrClientApp.Networking
             }
         }
     }
-
 }
+
