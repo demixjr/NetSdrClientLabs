@@ -659,6 +659,7 @@ public class NetSdrClientTests
         var listeningTask = udpWrapper.StartListeningAsync();
         udpWrapper.StopListening();
         await listeningTask;
+        Assert.That(listeningTask.IsCompleted, Is.True);
     }
 
     [Test]
