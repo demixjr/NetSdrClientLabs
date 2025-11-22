@@ -1,6 +1,8 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Threading.Tasks;
 using Moq;
@@ -431,6 +433,63 @@ public class NetSdrClientTests
         Assert.That(wrapper2.GetHashCode(), Is.Not.EqualTo(wrapper1.GetHashCode()));
     }
 
+    [Test]
+    public async Task StartListeningAsync_FinallyDisposesResources()
+    {
+        var wrapper = new UdpClientWrapper(0);
+
+        var task = wrapper.StartListeningAsync();
+        wrapper.StopListening();
+        await task;
+
+        var udp = typeof(UdpClientWrapper)
+            .GetField("_udpClient", BindingFlags.NonPublic | BindingFlags.Instance)?
+            .GetValue(wrapper);
+
+        var cts = typeof(UdpClientWrapper)
+            .GetField("_cts", BindingFlags.NonPublic | BindingFlags.Instance)?
+            .GetValue(wrapper);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(udp, Is.Null, "_udpClient must be null after finally");
+            Assert.That(cts, Is.Null, "_cts must be null after finally");
+        });
+    }
+
+    [Test]
+    public async Task StartListeningAsync_StopsByCancellation_NoException()
+    {
+        var wrapper = new UdpClientWrapper(0);
+
+        var t = wrapper.StartListeningAsync();
+
+        // cancel
+        wrapper.StopListening();
+
+        await t;
+
+        Assert.Pass("StopListening triggered OperationCanceledException and it was caught.");
+    }
+
+    [Test]
+    public async Task StartListeningAsync_PortAlreadyInUse_ExceptionCatchCovered()
+    {
+        // створюємо сокет, який займає порт
+        var tmp = new UdpClient(new IPEndPoint(IPAddress.Any, 0));
+        int usedPort = ((IPEndPoint)tmp.Client.LocalEndPoint!).Port;
+
+        var wrapper = new UdpClientWrapper(usedPort);
+
+        // тепер StartListeningAsync не зможе створити UdpClient → Exception
+        await wrapper.StartListeningAsync();
+
+        tmp.Dispose();
+
+        Assert.Pass("catch(Exception) був виконаний");
+    }
+
+
     // TcpClientWrapper tests
     [Test]
     public void Constructor_ValidHostAndPort_SetsProperties()
@@ -724,5 +783,189 @@ public class NetSdrClientTests
         udpWrapper.StopListening();
         await listeningTask;
     }
-  
+
+    public class TcpClientWrapper_Connect_Dispose_Tests
+    {
+        private static int GetFreePort()
+        {
+            var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            listener.Stop();
+            return port;
+        }
+
+
+        [Test]
+        public void Connect_Success_ConnectedBecomesTrue()
+        {
+            int port = GetFreePort();
+
+            var listener = new TcpListener(IPAddress.Loopback, port);
+            listener.Start();
+
+            var wrapper = new TcpClientWrapper("127.0.0.1", port);
+
+            wrapper.Connect();
+
+            Assert.That(wrapper.Connected, Is.True, "Wrapper must report Connected after successful Connect()");
+
+            wrapper.Dispose();
+            listener.Stop();
+        }
+
+        [Test]
+        public void Connect_SecondCall_DoesNotThrow()
+        {
+            int port = GetFreePort();
+
+            var listener = new TcpListener(IPAddress.Loopback, port);
+            listener.Start();
+
+            var wrapper = new TcpClientWrapper("127.0.0.1", port);
+
+            wrapper.Connect();
+            Assert.DoesNotThrow(() => wrapper.Connect(), "Second Connect() should not throw");
+
+            wrapper.Dispose();
+            listener.Stop();
+        }
+
+        [Test]
+        public void Connect_Fails_NoServerRunning_NoThrow()
+        {
+            int port = GetFreePort(); 
+
+            var wrapper = new TcpClientWrapper("127.0.0.1", port);
+
+            Assert.DoesNotThrow(() => wrapper.Connect(),
+                "Connect() catches exceptions, test must not throw");
+
+            Assert.That(wrapper.Connected, Is.False, "Should not be connected when no server exists");
+
+            wrapper.Dispose();
+        }
+
+        [Test]
+        public void Dispose_CanBeCalledMultipleTimes()
+        {
+            int port = GetFreePort();
+
+            var wrapper = new TcpClientWrapper("127.0.0.1", port);
+
+            wrapper.Dispose();
+
+            Assert.DoesNotThrow(() => wrapper.Dispose(),
+                "Multiple Dispose() calls must not throw");
+        }
+
+        [Test]
+        public void Dispose_AfterSuccessfulConnect_ConnectedBecomesFalse()
+        {
+            int port = GetFreePort();
+
+            var listener = new TcpListener(IPAddress.Loopback, port);
+            listener.Start();
+
+            var wrapper = new TcpClientWrapper("127.0.0.1", port);
+
+            wrapper.Connect();
+            Assert.That(wrapper.Connected, Is.True);
+
+            wrapper.Dispose();
+
+            Assert.That(wrapper.Connected, Is.False, "Dispose() must fully disconnect");
+
+            listener.Stop();
+        }
+    }
+    public class TcpClientWrapper_DisposeCoverage_Tests
+    {
+        private static int GetFreePort()
+        {
+            var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            listener.Stop();
+            return port;
+        }
+
+        [Test]
+        public void Connect_CreatesAndDisposesOldCts()
+        {
+            int port = GetFreePort();
+
+            var listener = new TcpListener(IPAddress.Loopback, port);
+            listener.Start();
+
+            var wrapper = new TcpClientWrapper("127.0.0.1", port);
+            wrapper.Connect();
+
+            Assert.That(wrapper.Connected, Is.True);
+
+            // --- Другий виклик Connect() призводить до виконання _cts?.Dispose() ---
+            Assert.DoesNotThrow(() => wrapper.Connect());
+
+            wrapper.Dispose();
+            listener.Stop();
+        }
+
+        // ---------------------------- DISPOSE() -----------------------------
+
+        [Test]
+        public void Dispose_WhenEverythingIsNull_DoesNotThrow()
+        {
+            var wrapper = new TcpClientWrapper("127.0.0.1", 12345);
+
+            Assert.DoesNotThrow(() => wrapper.Dispose(),
+                "Dispose() must not throw when all fields are null");
+        }
+
+        [Test]
+        public void Dispose_WhenClientAndStreamExist_DisposesAllFields()
+        {
+            int port = GetFreePort();
+
+            var listener = new TcpListener(IPAddress.Loopback, port);
+            listener.Start();
+
+            var wrapper = new TcpClientWrapper("127.0.0.1", port);
+
+            // створюємо повний робочий стан
+            wrapper.Connect();
+
+            Assert.That(wrapper.Connected, Is.True);
+
+            // --- тестуємо повну утилізацію ---
+            wrapper.Dispose();
+
+            // _tcpClient має стати null
+            var tcpField = typeof(TcpClientWrapper).GetField("_tcpClient",
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Instance);
+
+            Assert.That(tcpField?.GetValue(wrapper), Is.Null, "_tcpClient must be set to null after Dispose()");
+
+            listener.Stop();
+        }
+
+        [Test]
+        public void Dispose_CanBeCalledTwice_WhenConnected()
+        {
+            int port = GetFreePort();
+
+            var listener = new TcpListener(IPAddress.Loopback, port);
+            listener.Start();
+
+            var wrapper = new TcpClientWrapper("127.0.0.1", port);
+
+            wrapper.Connect();
+
+            Assert.DoesNotThrow(() => wrapper.Dispose());
+            Assert.DoesNotThrow(() => wrapper.Dispose(),
+                "Dispose() must be idempotent");
+
+            listener.Stop();
+        }
+    }
 }

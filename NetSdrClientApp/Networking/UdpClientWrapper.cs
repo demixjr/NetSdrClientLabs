@@ -23,29 +23,40 @@ namespace NetSdrClientApp.Networking
 
         public async Task StartListeningAsync()
         {
+            _cts?.Dispose();
             _cts = new CancellationTokenSource();
+
             Console.WriteLine("Start listening for UDP messages...");
 
             try
             {
                 _udpClient = new UdpClient(_localEndPoint);
+
                 while (!_cts.Token.IsCancellationRequested)
                 {
                     UdpReceiveResult result = await _udpClient.ReceiveAsync(_cts.Token);
                     MessageReceived?.Invoke(this, result.Buffer);
-
                     Console.WriteLine($"Received from {result.RemoteEndPoint}");
                 }
             }
             catch (OperationCanceledException)
             {
-                //empty
+
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error receiving message: {ex.Message}");
             }
+            finally
+            {
+                _udpClient?.Dispose();
+                _cts?.Dispose();
+                _udpClient = null;
+                _cts = null;
+                Console.WriteLine("UDP listener stopped.");
+            }
         }
+
 
         public void StopListening()
         {
